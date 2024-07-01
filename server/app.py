@@ -1,32 +1,26 @@
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Column, Integer, String
 import string
 import random
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, redirect, request, jsonify
 from dotenv import load_dotenv
+from pymongo import MongoClient
+from flask_cors import CORS
 
 load_dotenv()
 
 app = Flask(__name__)
 
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv('DB_URL')
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+CORS(app)
 
-db = SQLAlchemy(app)
+def get_db():
+    mongo_uri = os.environ.get('MONGO_URI')
+    client = MongoClient(mongo_uri)
 
-class UrlEntry(db.Model):
-    __tablename__ = 'urls'
-    id = Column(Integer, primary_key=True)
-    original_url = Column(String(255), nullable=False)
-    short_url = Column(String(20), nullable=False, unique=True)
+    db = client["urldb"]
 
-    def __init__(self, original_url, short_url):
-        self.original_url = original_url
-        self.short_url = short_url
+    return db
 
-    def __repr__(self):
-        return '<UrlEntry %r>' % self.short_url
+db = get_db()
 
 def generate_random_string():
     length = 6
@@ -41,20 +35,31 @@ def short_url():
         return jsonify({"error": "Missing requests data"}), 400
     
     try:
-        original_url = data["url"]
-        short_url = generate_random_string()
 
-        new_url_entry = UrlEntry(original_url=original_url, short_url=short_url)
+       collection = db["url"]
+       short = generate_random_string()
+       url = {
+            "original_url": data["url"],
+            "short_url": short,
+        }
 
-        db.session.add(new_url_entry)
-        db.session.commit()
+       collection_id = collection.insert_one(url).inserted_id
 
-        return jsonify({"short_url": short_url})
+       return jsonify({"data": {"id": str(collection_id), "url": short }})
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
+
+@app.route('/<short_url>')
+def redirect_to_url(short_url):
+    collection = db["url"]
+    url_mapping = collection.find_one({'short_url': short_url})
+
+    if url_mapping:
+        return redirect(url_mapping['original_url'])
+    else:
+        return jsonify({"message: Short URL not found"}), 404
 
 if __name__ == '__main__':
-    app.run(debug=True, host='backend', port=8000)
+    app.run(debug=True, host='0.0.0.0', port=8000)
 
