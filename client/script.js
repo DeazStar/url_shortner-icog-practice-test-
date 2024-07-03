@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("Please enter a URL");
       return;
     }
-
+    const host = "http://0.0.0.0:8000";
     fetch("http://0.0.0.0:8000", {
       method: "POST",
       headers: {
@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
         resultContainer[0].innerHTML = `
                               <p class="text-center">
         Your shorten link:
-                                <a href="localhost:8000/${data.data.url}" class="text-decoration-none">${data.data.url}</a>
+                                <a href="${host}/${data.data.url}" class="text-decoration-none">${data.data.url}</a>
       </p>
                     `;
       })
